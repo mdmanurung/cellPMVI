@@ -126,6 +126,10 @@ class CellPMVAECiteseq(TOTALVAE):
         # Skip TOTALVAE.__init__, call BaseModuleClass.__init__ directly
         super(TOTALVAE, self).__init__()
 
+        # Set attributes that TOTALVAE's inherited methods expect
+        self.panel_key = REGISTRY_KEYS.BATCH_KEY
+        self.n_panel = n_batch
+
         self.gene_dispersion = gene_dispersion
         self.n_latent = n_latent
         self.log_variational = log_variational
@@ -241,6 +245,37 @@ class CellPMVAECiteseq(TOTALVAE):
             use_batch_norm=use_batch_norm_decoder,
             use_layer_norm=use_layer_norm_decoder,
             scale_activation="softplus" if use_size_factor_key else "softmax",
+        )
+
+    def _get_inference_input(
+        self, tensors: dict, **kwargs
+    ) -> dict:
+        """Extract inference inputs from data tensors."""
+        x = tensors[REGISTRY_KEYS.X_KEY]
+        y = tensors[REGISTRY_KEYS.PROTEIN_EXP_KEY]
+        batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
+        cont_covs = tensors.get(REGISTRY_KEYS.CONT_COVS_KEY, None)
+        cat_covs = tensors.get(REGISTRY_KEYS.CAT_COVS_KEY, None)
+        return dict(
+            x=x, y=y, batch_index=batch_index,
+            cont_covs=cont_covs, cat_covs=cat_covs,
+        )
+
+    def _get_generative_input(
+        self, tensors: dict, inference_outputs: dict, **kwargs
+    ) -> dict:
+        """Extract generative inputs from tensors and inference outputs."""
+        z = inference_outputs["z"]
+        library_gene = inference_outputs["library_gene"]
+        batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
+        label = tensors[REGISTRY_KEYS.LABELS_KEY]
+        cont_covs = tensors.get(REGISTRY_KEYS.CONT_COVS_KEY, None)
+        cat_covs = tensors.get(REGISTRY_KEYS.CAT_COVS_KEY, None)
+        size_factor = tensors.get(REGISTRY_KEYS.SIZE_FACTOR_KEY, None)
+        return dict(
+            z=z, library_gene=library_gene, batch_index=batch_index,
+            label=label, cont_covs=cont_covs, cat_covs=cat_covs,
+            size_factor=size_factor,
         )
 
     @auto_move_data

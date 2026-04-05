@@ -166,6 +166,50 @@ class CellPMVICiteseq(UnsupervisedTrainingMixin, BaseModelClass):
         cls.register_manager(adata_manager)
 
     @torch.no_grad()
+    def get_latent_representation(
+        self,
+        adata: AnnData | None = None,
+        indices: Sequence[int] | None = None,
+        give_mean: bool = True,
+        batch_size: int | None = None,
+    ) -> np.ndarray:
+        """Get latent representation for cells.
+
+        Parameters
+        ----------
+        adata
+            AnnData to use. Defaults to training data.
+        indices
+            Cell indices. Defaults to all cells.
+        give_mean
+            If ``True``, return posterior mean; otherwise sample.
+        batch_size
+            Minibatch size.
+
+        Returns
+        -------
+        np.ndarray
+            Latent representation of shape ``(n_cells, n_latent)``.
+        """
+        adata = self._validate_anndata(adata)
+        scdl = self._make_data_loader(
+            adata=adata, indices=indices, batch_size=batch_size or 128
+        )
+
+        latent = []
+        for tensors in scdl:
+            inference_inputs = self.module._get_inference_input(tensors)
+            outputs = self.module.inference(**inference_inputs)
+            if give_mean:
+                # Average gene and protein latent means
+                z = (outputs["qz_m"]["gene"] + outputs["qz_m"]["protein"]) / 2
+            else:
+                z = outputs["z"]["gene"]
+            latent.append(z.cpu().numpy())
+
+        return np.concatenate(latent, axis=0)
+
+    @torch.no_grad()
     def posterior_predictive_sample(
         self,
         adata: AnnData | None = None,

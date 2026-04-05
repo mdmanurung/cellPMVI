@@ -10,3 +10,5 @@ build/
 .env
 .venv/
 docs/_build/
+vignettes/data/
+vignettes/results/
